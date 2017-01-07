@@ -1,7 +1,9 @@
 extern crate libc;
+extern crate tempdir;
 
 use std::ffi::{CStr, CString};
 use std::{str, ptr};
+use std::path::Path;
 
 mod ffi;
 pub use ffi::Status;
@@ -13,8 +15,9 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn create(path: &str) -> Result<Database, Status> {
-        let cstring = CString::new(path).unwrap();
+    pub fn create(path: &Path) -> Result<Database, Status> {
+        let path_str = path.to_str().unwrap();
+        let cstring = CString::new(path_str.as_bytes()).unwrap();
         let mut database: ffi::database_t = ptr::null_mut();
         unsafe {
             match ffi::notmuch_database_create(cstring.as_ptr(), &mut database) {
@@ -24,8 +27,9 @@ impl Database {
         }
     }
 
-    pub fn open(path: &str, mode: OpenMode) -> Result<Database, Status> {
-        let cstring = CString::new(path).unwrap();
+    pub fn open(path: &Path, mode: OpenMode) -> Result<Database, Status> {
+        let path_str = path.to_str().unwrap();
+        let cstring = CString::new(path_str.as_bytes()).unwrap();
         let mut database: ffi::database_t = ptr::null_mut();
         unsafe {
             match ffi::notmuch_database_open(cstring.as_ptr(), mode, &mut database) {
@@ -56,7 +60,11 @@ pub fn explain_status(status: Status) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::fs;
+    use tempdir::TempDir;
+
+    macro_rules! t {
+        ($e:expr) => (match $e { Ok(n) => n, Err(e) => panic!("error: {}", e) })
+    }
 
     #[test]
     fn status_descriptions() {
@@ -67,17 +75,16 @@ mod test {
 
     #[test]
     fn create_and_open_database() {
-        let path = ".test-notmuch-rs";
-        fs::create_dir(path).unwrap();
+        let dir = TempDir::new("db_dir").unwrap();
         {
-            Database::create(path).unwrap();
+            Database::create(dir.path()).unwrap();
         }
         {
-            Database::open(path, OpenMode::ReadOnly).unwrap();
+            Database::open(dir.path(), OpenMode::ReadOnly).unwrap();
         }
         {
-            Database::open(path, OpenMode::ReadWrite).unwrap();
+            Database::open(dir.path(), OpenMode::ReadWrite).unwrap();
         }
-        fs::remove_dir_all(path).unwrap();
+        t!(dir.close());
     }
 }

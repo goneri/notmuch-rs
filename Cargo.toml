@@ -5,3 +5,4 @@ authors = ["Klemens Schölhorn <klemens@schoelhorn.eu>"]
 
 [dependencies]
 libc = "0.1"
+tempdir = "0.3"
